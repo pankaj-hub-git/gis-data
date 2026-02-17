@@ -138,3 +138,26 @@ SELECT
 FROM bronze.dda_plots
 GROUP BY project_name, land_use_category, land_use_subtype
 ORDER BY project_name, land_use_category;
+
+-- ============================================================
+-- Per-project ingestion audit view
+-- Shows completeness & data quality at a glance
+-- ============================================================
+CREATE OR REPLACE VIEW bronze.ingestion_audit AS
+SELECT
+    project_name,
+    COUNT(*)                                                         AS total_plots,
+    COUNT(*) FILTER (WHERE geometry IS NOT NULL)                     AS with_geometry,
+    COUNT(*) FILTER (WHERE geometry IS NULL)                         AS missing_geometry,
+    COUNT(*) FILTER (WHERE plot_number IS NOT NULL)                  AS with_plot_number,
+    COUNT(*) FILTER (WHERE land_use IS NOT NULL)                     AS with_land_use,
+    COUNT(*) FILTER (WHERE max_height IS NOT NULL)                   AS with_height,
+    COUNT(*) FILTER (WHERE plot_area_sqm IS NOT NULL AND plot_area_sqm > 0) AS with_area,
+    COUNT(*) FILTER (WHERE max_gfa_sqm IS NOT NULL AND max_gfa_sqm > 0)    AS with_gfa,
+    COUNT(*) FILTER (WHERE is_buildable)                             AS buildable,
+    COUNT(*) FILTER (WHERE site_plan_active)                         AS active_plans,
+    MIN(ingested_at)                                                 AS first_ingested,
+    MAX(updated_at)                                                  AS last_updated
+FROM bronze.dda_plots
+GROUP BY project_name
+ORDER BY total_plots DESC;

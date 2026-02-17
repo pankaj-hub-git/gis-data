@@ -31,6 +31,7 @@ from pipeline.config import SERVICES
 from pipeline.db import get_conn, init_schema, run_sql_file
 from pipeline.http_client import fetch_json
 from pipeline.ingest_plots import ingest_full_dubai
+from pipeline.verify_ingestion import verify_all, fix_missing_plots
 
 logging.basicConfig(
     level=logging.INFO,
@@ -215,6 +216,17 @@ def main():
     sql_path = Path(__file__).parent.parent / "sql" / "002_enrichment.sql"
     run_sql_file(sql_path)
 
+    # Run verification for key projects
+    logger.info("Running ingestion verification")
+    key_projects = ["DUBAI HILLS", "BUSINESS BAY"]
+    reports = verify_all(key_projects, fix=True)
+    all_complete = all(r["is_complete"] for r in reports)
+
+    if not all_complete:
+        logger.warning("VERIFICATION FAILED — some plots still missing after fix attempt")
+    else:
+        logger.info("VERIFICATION PASSED — all plots present for %s", ", ".join(key_projects))
+
     # Log summary
     db_count = get_db_record_count()
     end_time = datetime.now(timezone.utc)
@@ -224,11 +236,22 @@ def main():
     logger.info("=" * 60)
 
     # Write status file for monitoring
+    verification_summary = {
+        project: {
+            "api_count": r["api_count"],
+            "db_count": r["db_count"],
+            "missing": r["missing_count"],
+            "complete": r["is_complete"],
+        }
+        for r, project in zip(reports, key_projects)
+    }
     status = {
         "last_run": end_time.isoformat(),
         "total_plots": db_count,
         "full_scan": needs_full_scan,
         "duration_seconds": (end_time - start_time).total_seconds(),
+        "verification": verification_summary,
+        "all_verified": all_complete,
     }
     Path("logs/daily_status.json").write_text(json.dumps(status, indent=2))
 
