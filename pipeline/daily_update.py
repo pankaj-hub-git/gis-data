@@ -32,6 +32,7 @@ from pipeline.db import get_conn, init_schema, run_sql_file
 from pipeline.http_client import fetch_json
 from pipeline.ingest_plots import ingest_full_dubai
 from pipeline.verify_ingestion import verify_all, fix_missing_plots
+from pipeline.view_analysis import run_full_analysis as run_view_analysis
 
 logging.basicConfig(
     level=logging.INFO,
@@ -215,6 +216,11 @@ def main():
     logger.info("Running enrichment")
     sql_path = Path(__file__).parent.parent / "sql" / "002_enrichment.sql"
     run_sql_file(sql_path)
+
+    # Run view blocking analysis (depends on enrichment for centroids + floor_count)
+    logger.info("Running view blocking analysis")
+    run_view_analysis()
+    logger.info("View blocking analysis complete")
 
     # Run verification for key projects
     logger.info("Running ingestion verification")

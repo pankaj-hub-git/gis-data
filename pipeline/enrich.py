@@ -25,11 +25,18 @@ logger = logging.getLogger(__name__)
 
 def main():
     Path("logs").mkdir(exist_ok=True)
+
+    # Step 1: Base enrichment (floor counts, land use, centroids, units, buildable flags)
     sql_path = Path(__file__).parent.parent / "sql" / "002_enrichment.sql"
     logger.info("Running enrichment SQL: %s", sql_path)
-
     run_sql_file(sql_path)
     logger.info("Enrichment complete")
+
+    # Step 2: View blocking analysis (visual assets + threat computation)
+    from pipeline.view_analysis import run_full_analysis
+    logger.info("Running view blocking analysis")
+    run_full_analysis()
+    logger.info("View blocking analysis complete")
 
     # Print summary stats
     with get_conn() as conn:
@@ -49,6 +56,15 @@ def main():
             cur.execute("SELECT COUNT(*) FROM bronze.dda_plots WHERE site_plan_active = TRUE")
             active = cur.fetchone()[0]
             logger.info("Active site plans: %d", active)
+
+            # View blocking stats
+            cur.execute("SELECT COUNT(*) FROM bronze.dda_plots WHERE is_view_blocker = TRUE")
+            blockers = cur.fetchone()[0]
+            logger.info("View blocker plots: %d", blockers)
+
+            cur.execute("SELECT COUNT(*) FROM bronze.dda_plots WHERE view_threat_level IN ('CRITICAL','HIGH')")
+            high_threats = cur.fetchone()[0]
+            logger.info("CRITICAL+HIGH view threats: %d", high_threats)
 
             cur.execute("""
                 SELECT project_name, COUNT(*), SUM(estimated_units)
