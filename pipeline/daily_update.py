@@ -32,6 +32,7 @@ from pipeline.db import get_conn, init_schema, run_sql_file
 from pipeline.http_client import fetch_json
 from pipeline.ingest_plots import ingest_full_dubai
 from pipeline.verify_ingestion import verify_all, fix_missing_plots
+from pipeline.layers import init_layer_schemas, run_layer_computation
 from pipeline.name_resolver import run_full_resolution as run_name_resolution
 from pipeline.view_analysis import run_full_analysis as run_view_analysis
 
@@ -227,6 +228,12 @@ def main():
     logger.info("Running view blocking analysis")
     run_view_analysis()
     logger.info("View blocking analysis complete")
+
+    # Run ZEROAGENT layer computation (amenities, infra, supply, transformation, truth)
+    logger.info("Running ZEROAGENT layer computation")
+    init_layer_schemas()
+    run_layer_computation()
+    logger.info("Layer computation complete")
 
     # Run verification for key projects
     logger.info("Running ingestion verification")
